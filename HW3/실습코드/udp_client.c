@@ -31,7 +31,6 @@ int main(int argc, char** argv) {
         printf("Input Message (Q or q) : ");
         scanf("%s", buf);
         //printf("%s\n", buf);
-        //sendto로 메세지 보낸다.
         int res = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*)&serv_addr, sizeof(serv_addr)); //TCP에 비해 끝에 두개 추가
         if(res < 0) { //sendto 는 전송한 바이트 수를 반환하기 때문에 음수면 실패한 것.
             perror("send error");

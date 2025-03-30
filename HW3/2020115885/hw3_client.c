@@ -31,9 +31,11 @@ int main(int argc, char** argv) {
     scanf("%d", &opCount); //operation Count를 입력받는다
     buf[0] = (char)opCount; //buf배열 첫번째 인덱스에 opCount를 char형태로 저장
 
+    len = sizeof(servaddr);
+
     if(buf[0] <= 0) { //opCount가 음수면 소켓에 buf내용을 보내고 서버소켓 종료
         //write(sfd, buf, 1);
-        sendto(sfd, buf, 1, 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
+        sendto(sfd, buf, 1, 0, (struct sockaddr*)&servaddr, len);
         close(sfd);
         return 0;
     }
@@ -48,13 +50,11 @@ int main(int argc, char** argv) {
         scanf(" %c", &buf[(opCount*4)+1+i]); //operator를 buf배열의 숫자개수x4+1+i 인덱스에 opCount입력받기(buf마지막에 operator들 넣기)
     }
 
-    len = sizeof(servaddr);
+    //write
+    sendto(sfd, buf, 1+(opCount*4)+(opCount-1), 0, (struct sockaddr*)&servaddr, len); //server소켓에 buf의 데이터를 한번에 전달
 
-    //write(sfd, buf, (opCount*4)+(opCount-1)*4); //server소켓에 buf의 데이터를 전달
-    sendto(sfd, buf, (opCount*4)+(opCount-1)*4, 0, (struct sockaddr*)&servaddr, len);
-
-    //read(sfd, &opResult, 4); //server소켓에서 데이터를 읽어와서 opResult에 저장
-    recvfrom(sfd, &opResult, 4, 0, (struct sockaddr*)&servaddr, &len);
+    //read(sfd, &opResult, 4); 
+    recvfrom(sfd, &opResult, 4, 0, (struct sockaddr*)&servaddr, &len); //server소켓에서 데이터를 읽어와서 opResult에 저장
     printf("Operation result: %d\n", opResult);
 
     close(sfd);

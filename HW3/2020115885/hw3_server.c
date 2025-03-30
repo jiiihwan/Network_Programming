@@ -14,6 +14,7 @@ int main(int argc, char** argv) {
     int opResult;
     int operand[MAX];
     char operator;
+    char buf[MAX];
 
     if(argc < 2) {
         printf("usage:./server localPort\n");
@@ -37,14 +38,16 @@ int main(int argc, char** argv) {
         return 1;
     }       
 
-    len = sizeof(cliaddr);
-
     while(1){
-        //read(cfd, &opCount, 1); //cfd로부터 최대 1바이트만 읽어서 opCount변수에 저장한다
-        recvfrom(cfd,&opCount,1,0,(struct sockaddr*)&cliaddr,&len);
+        len = sizeof(cliaddr);
+        //read
+        recvfrom(sfd,&buf,MAX,0,(struct sockaddr*)&cliaddr,&len); //buf로 전체 내용(opCount, operand, operator)을 한번에 받기
+        
+        opCount = buf[0]; //buf값으로 opCount 정의
+
         if(opCount <= 0) { 
             printf("Server close(%d)\n",opCount);
-            close(cfd);
+            close(sfd);
             return 0;
             //break;
         }
@@ -52,35 +55,31 @@ int main(int argc, char** argv) {
         printf("Operand count: %d\n", opCount); //그리고 operand count 출력
 
         for(int i=0; i<opCount; i++) { //입력한 opCount만큼 반복
-            //read(cfd, &operand[i], 4); //클라이언트로소켓으로부터 4바이트씩 읽고 operand[i]에 저장, read는 이전에 읽은 데이터 다음 위치에서 계속 읽어서 이렇게 가능하다
-            recvfrom(cfd,&operand[i],4,0,(struct sockaddr*)&cliaddr,&len);
+            //read(cfd, &operand[i], 4);
+            memcpy(&operand[i], &buf[1 + i * 4], 4); //buf에서 oprand값 파싱, 이때 char->int로 받아야하니 memcpy로 복사, operand가 4바이트씩 차지하니까 크기는 4바이트로.
             printf("Operand %d: %d\n", i, operand[i]); //i번째 operand 출력
         }
 
-        //read(cfd, &operator, 1); //1바이트(char) 읽어서 operator에 저장
-        recvfrom(cfd,&operator,1,0,(struct sockaddr*)&cliaddr,&len);
-
         opResult = operand[0];  //opResult에 첫번째 숫자 전달
-        for(int i=0; i<opCount-1; i++) { //operator 빼고 반복
+
+        for(int i=0; i<opCount-1; i++) { 
+            operator = buf[1+opCount*4+i]; //operator정의, operand가 4바이트니까 operand개수*4 만큼 띄우는거 주의
+
             switch (operator) { //operator case에 따른 스위치문
-            case '+':
-                opResult += operand[i+1]; //+일경우 opresult변수에 i+1 번째 숫자 덧셈
-                break;
-            case '-':
-                opResult -= operand[i+1];
-                break;
-            case '*':
-                opResult *= operand[i+1];
+                case '+':
+                    opResult += operand[i+1]; //+일경우 opresult변수에 i+1 번째 숫자 덧셈
+                    break;
+                case '-':
+                    opResult -= operand[i+1];
+                    break;
+                case '*':
+                    opResult *= operand[i+1];
             }
-            //read(cfd, &operator, 1); //1바이트(char) 읽어서 operator에 저장
-            recvfrom(cfd,&operator,1,0,(struct sockaddr*)&cliaddr,&len);
         }
 
         printf("Operation result: %d\n", opResult); 
-        //write(cfd, &opResult, 4); //클라이언트 소켓에 opResult 전송
-        sendto(cfd, &opResult, 4, 0, (const struct sockaddr*)&cliaddr,len);
-
-        close(cfd); //클라이언트 소켓 닫기
+        //write(cfd, &opResult, 4); 
+        sendto(sfd, &opResult, 4, 0, (const struct sockaddr*)&cliaddr,len); //클라이언트 소켓에 opResult 전송
     }
     
     close(sfd); //서버 소켓 닫기
