@@ -8,8 +8,8 @@ void error_handling(char *message);
 int main(int argc, char *argv[]) 
 {
 	int tcp_sock, udp_sock;
-	int sock_type;
-	socklen_t optlen;
+	int sock_type; //소켓 타입 옵션 버퍼
+	socklen_t optlen; //옵션 길이 전달용
 	int state;
 	
 	optlen=sizeof(sock_type);

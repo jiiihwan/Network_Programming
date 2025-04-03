@@ -9,12 +9,13 @@ int main(int argc, char *argv[])
 {
 	int i;
 	struct hostent *host;
+
 	if(argc!=2) {
 		printf("Usage : %s <addr>\n", argv[0]);
 		exit(1);
 	}
 	
-	host=gethostbyname(argv[1]);
+	host=gethostbyname(argv[1]); //인자로 받은걸 그대로 host로 쓴다
 	if(!host)
 		error_handling("gethost... error");
 
