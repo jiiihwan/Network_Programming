@@ -40,12 +40,12 @@ int main(int argc, char *argv[])
 	while(1)
 	{
 		read_cnt=fread((void*)buf, 1, BUF_SIZE, fp); //버퍼에 든 문자열 개수를 반환
-		if(read_cnt<BUF_SIZE) //버퍼 사이즈보다 작을때(파일 끝네 도달했을때)
+		if(read_cnt<BUF_SIZE) //버퍼 사이즈보다 작을때(파일 끝에 도달했을때)
 		{
 			write(clnt_sd, buf, read_cnt); //마지막 조각을 전달
 			break; 
 		}
-		write(clnt_sd, buf, BUF_SIZE); //버퍼 사이즈만큼 전달
+		write(clnt_sd, buf, BUF_SIZE); //버퍼 사이즈만큼 전달(최대한 전달)
 	}
 	
 	shutdown(clnt_sd, SHUT_WR);	//서버가 클라이언트에게 더이상 write할거 없다고 알림, read는 할 수 있음

@@ -15,6 +15,7 @@ int main(int argc, char *argv[])
 	char buf[BUF_SIZE];
 	int read_cnt; //읽은 바이트 수
 	struct sockaddr_in serv_adr; //서버 주소 정보 구조체 선언
+	
 	if(argc!=3) {  //인자가 3개가 아니면 사용법 출력
 		printf("Usage: %s <IP> <port>\n", argv[0]); 
 		exit(1);
@@ -31,10 +32,11 @@ int main(int argc, char *argv[])
 	connect(sd, (struct sockaddr*)&serv_adr, sizeof(serv_adr)); //서버와 연결
 	
 	while((read_cnt=read(sd, buf, BUF_SIZE ))!=0) //읽은 바이트수가 버퍼의 사이즈랑 같지 않을때까지 
-		fwrite((void*)buf, 1, read_cnt, fp); //fwrite(파일에 쓸 데이터가 저장된 메모리 주소, 데이터 바이트, 개수, 파일 포인터)
+		fwrite((void*)buf, 1, read_cnt, fp); //fwrite(파일에 쓸 데이터가 저장된 메모리 주소, 데이터 바이트, 개수, 파일 포인터), copy.txt.에 쓴다
 	
 	puts("Received file data"); //puts는 지동 줄바꿈이 있는 문자열 출력
 	write(sd, "Thank you", 10); //write(파일디스크립터, 출력할 데이터의 포인터 또는 문자열, 바이트 수), 서버에 문자열을 보낸다
+	//참고로 위에꺼가 10바이트인 이유는 뒤에 NULL까지 보내기 때문
 	fclose(fp); //열었던 파일 스트림 종료, 버퍼 비우고 리소스 해제 
 	close(sd); //소켓 닫기
 	return 0;
