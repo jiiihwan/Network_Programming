@@ -10,13 +10,13 @@ int main(int argc, char *argv[])
 	char buf[BUF_SIZE];
 	pid_t pid;
 	
-	pipe(fds);
+	pipe(fds); // fds[0]: 읽기용, fds[1]: 쓰기용
 	pid=fork();
-	if(pid==0)
+	if(pid==0) //자식프로세스
 	{
-		write(fds[1], str, sizeof(str));
+		write(fds[1], str, sizeof(str)); 
 	}
-	else
+	else //부모프로세스
 	{
 		read(fds[0], buf, BUF_SIZE);
 		puts(buf);

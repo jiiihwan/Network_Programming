@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   if (listen(serv_sock, 5) == -1)
     error_handling("listen() error");
 
-  pipe(fds);
+  pipe(fds); 
   pid = fork();
   if (pid == 0) {
     FILE* fp = fopen("echomsg.txt", "wt");
