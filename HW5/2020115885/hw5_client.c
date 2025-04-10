@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
         scanf(" %c", &buf[(opCount*4)+1+i]); //operator를 buf배열의 숫자개수x4+1+i 인덱스에 opCount입력받기(buf마지막에 operator들 넣기)
     }
 
-    write(sfd, buf, (opCount*4)+(opCount-1)*4); //server소켓에 buf의 데이터를 전달
+    write(sfd, buf, 1+(opCount*4)+(opCount-1)); //server소켓에 buf의 데이터를 전달
 
     read(sfd, &opResult, 4); //server소켓에서 데이터를 읽어와서 opResult에 저장
     printf("Operation result: %d\n", opResult);
