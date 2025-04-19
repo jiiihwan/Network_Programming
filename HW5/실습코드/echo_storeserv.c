@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
   struct sigaction act;
   socklen_t adr_sz;
   int str_len, state;
+  
   if (argc != 2) {
     printf("Usage : %s <port>\n", argv[0]);
     exit(1);
@@ -46,14 +47,14 @@ int main(int argc, char* argv[]) {
 
   pipe(fds); 
   pid = fork();
-  if (pid == 0) {
-    FILE* fp = fopen("echomsg.txt", "wt");
+  if (pid == 0) { //자식프로세스
+    FILE* fp = fopen("echomsg.txt", "wt"); //파일 생성
     char msgbuf[BUF_SIZE];
     int i, len;
 
-    for (i = 0; i < 10; i++) {
-      len = read(fds[0], msgbuf, BUF_SIZE);
-      fwrite((void*)msgbuf, 1, len, fp);
+    for (i = 0; i < 10; i++) { //최대 10번까지 읽기
+      len = read(fds[0], msgbuf, BUF_SIZE); //pipe에서 읽기
+      fwrite((void*)msgbuf, 1, len, fp); //파일로 저장
     }
     fclose(fp);
     return 0;
@@ -62,26 +63,27 @@ int main(int argc, char* argv[]) {
   while (1) {
     adr_sz = sizeof(clnt_adr);
     clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_adr, &adr_sz);
-    if (clnt_sock == -1)
+    if (clnt_sock == -1) //오류 시
       continue;
     else
       puts("new client connected...");
 
     pid = fork();
-    if (pid == 0) {
-      close(serv_sock);
-      while ((str_len = read(clnt_sock, buf, BUF_SIZE)) != 0) {
-        write(clnt_sock, buf, str_len);
-        write(fds[1], buf, str_len);
+    if (pid == 0) { //자식프로세스
+      close(serv_sock); //필요없는 서버 소켓은 닫기
+      while ((str_len = read(clnt_sock, buf, BUF_SIZE)) != 0) { //클라이언트로부터 read
+        write(clnt_sock, buf, str_len); //클라이언트 소켓에 echo
+        write(fds[1], buf, str_len); //파일 저장을 위해 파이프로 보내기
       }
 
-      close(clnt_sock);
+      close(clnt_sock); //클라이언트 소켓 닫기
       puts("client disconnected...");
       return 0;
-    } else
-      close(clnt_sock);
+
+    } else //부모 프로세스
+      close(clnt_sock); //필요없는 클라이언트 소켓은 닫기
   }
-  close(serv_sock);
+  close(serv_sock); //서버 소켓 닫기
   return 0;
 }
 
