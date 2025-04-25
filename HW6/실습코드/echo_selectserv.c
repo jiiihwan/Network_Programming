@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 200
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,13 +16,13 @@ void read_childproc(int sig);
 
 int main(int argc, char *argv[])
 {
-	int serv_sock, clnt_sock;
+	int serv_sock, clnt_sock; //서버와 클라이언트 소켓 선언
 	struct sockaddr_in serv_adr, clnt_adr;
-	struct timeval timeout;
-	fd_set reads, cpy_reads;
+	struct timeval timeout; //select 대기시간용
+	fd_set reads, cpy_reads; //select용 fd_set형 집합, 원본과 복사본
 
-	socklen_t adr_sz;
-	int fd_max, str_len, fd_num, i;
+	socklen_t adr_sz; //주소 사이즈 구조체
+	int fd_max, str_len, fd_num, i; //가장 큰 fd번호, 읽은데이터길이
 	char buf[BUF_SIZE];
 
 	pid_t pid;
@@ -34,13 +35,13 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	act.sa_handler=read_childproc;
+	act.sa_handler=read_childproc; //좀비프로세스 처리하는 핸들러 정의
 	sigemptyset(&act.sa_mask);
 	act.sa_flags=0;
-	state=sigaction(SIGCHLD, &act, 0);
+	state=sigaction(SIGCHLD, &act, 0); //child가 죽었을때 핸들러 실행
 
 
-	serv_sock=socket(PF_INET, SOCK_STREAM, 0);
+	serv_sock=socket(PF_INET, SOCK_STREAM, 0); //소켓 만들기
 	memset(&serv_adr, 0, sizeof(serv_adr));
 	serv_adr.sin_family=AF_INET;
 	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
@@ -51,18 +52,18 @@ int main(int argc, char *argv[])
 	if(listen(serv_sock, 5)==-1)
 		error_handling("listen() error");
 
-	pipe(fds_a);
-	pipe(fds_b);
+	pipe(fds_a); //파이프a 생성
+	pipe(fds_b); //파이프b 생성
 	pid=fork();
-	if(pid==0)
+	if(pid==0) //자식프로세스는
 	{
-		FILE * fp=fopen("log.txt", "a+");
+		FILE * fp=fopen("log.txt", "a+"); //로그파일 열고
 		char msgbuf[BUF_SIZE], modebuf[BUF_SIZE];
 		int i, len;
-		memset(msgbuf, 0, sizeof(msgbuf));
+		memset(msgbuf, 0, sizeof(msgbuf)); //버퍼 초기화
 		while(1)
 		{
-			len=read(fds_a[0], msgbuf, BUF_SIZE);
+			len=read(fds_a[0], msgbuf, BUF_SIZE); 
 
 			// 4bytes : mode read
 			
@@ -80,43 +81,42 @@ int main(int argc, char *argv[])
 
 	while(1)
 	{
-		cpy_reads=reads;
-		timeout.tv_sec=5;
+		cpy_reads=reads; //원본으로부터 복사
+		timeout.tv_sec=5; //대기시간 정의
 		timeout.tv_usec=0;
 
-		if((fd_num=select(fd_max+1, &cpy_reads, 0, 0, &timeout))==-1)
+		if((fd_num=select(fd_max+1, &cpy_reads, 0, 0, &timeout))==-1) //select로 등록된 소켓들 감시 
 			break;
 		
-		if(fd_num==0)
+		if(fd_num==0) //이벤트 없으면 타임아웃 
 			continue;
 
 		for(i=0; i<fd_max+1; i++)
 		{
-			if(FD_ISSET(i, &cpy_reads))
+			if(FD_ISSET(i, &cpy_reads)) //i로 전달된 파일디스크립터 정보가 있을경우 
 			{
 				if(i==serv_sock)     // connection request!
 				{
 					adr_sz=sizeof(clnt_adr);
-					clnt_sock=
-						accept(serv_sock, (struct sockaddr*)&clnt_adr, &adr_sz);
-					FD_SET(clnt_sock, &reads);
+					clnt_sock=accept(serv_sock, (struct sockaddr*)&clnt_adr, &adr_sz);
+					FD_SET(clnt_sock, &reads); //클라이언트소켓의 fd정보 등록
 					if(fd_max<clnt_sock)
-						fd_max=clnt_sock;
+						fd_max=clnt_sock; //fd_max 값 설정
 					printf("connected client: %d \n", clnt_sock);
 				}
-				else    // read message!
+				else    // read message!, 클라이언트로부터 데이터 수신
 				{
 					str_len=read(i, buf, BUF_SIZE);
 					if(str_len==0)    // close request!
 					{
-						FD_CLR(i, &reads);
+						FD_CLR(i, &reads); //i번째 fd에서 fd정보 삭제
 						close(i);
 						printf("closed client: %d \n", i);
 					}
 					else
 					{
 						write(i, buf, str_len);    // echo!
-						write(fds_a[1], buf, str_len);
+						write(fds_a[1], buf, str_len); //파이프로 자식프로세스에 기록 요청
 					}
 				}
 			}
