@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 		memset(msgbuf, 0, sizeof(msgbuf)); //버퍼 초기화
 		while(1)
 		{
-			len=read(fds_a[0], msgbuf, BUF_SIZE); 
+			len=read(fds_a[0], msgbuf, BUF_SIZE); //부모프로세스의 파이프로부터 메세지읽고 msgbuf에 저장
 
 			// 4bytes : mode read
 			

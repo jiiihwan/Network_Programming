@@ -4,10 +4,11 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/uio.h>  
 
 #define MAX 1024
-#define MODE_SIZE 1024
-#define ID_SIZE 1024
+#define MODE_SIZE 5
+#define ID_SIZE 5
 void error_handling(char *message);
 
 int main(int argc, char *argv[])
@@ -40,11 +41,12 @@ int main(int argc, char *argv[])
 
     //Mode출력 및 입력받기
     printf("Mode: ");
-    scanf("%s\n", mode);
+    scanf("%4s", mode);
     puts("");
     if (strcmp(mode, "save") != 0 && strcmp(mode, "load") != 0 && strcmp(mode, "quit") != 0) {
         printf("supported mode: save load quit");
         close(sock);
+        return 0;
     }
 
 
@@ -53,7 +55,7 @@ int main(int argc, char *argv[])
 	else
 		puts("Connected....");
     
-    if (strcmp(mode, "quit")) {
+    if (!strcmp(mode, "quit")) {
         puts("quit");
         vec[0].iov_base = mode;
         vec[0].iov_len = MODE_SIZE;
@@ -64,7 +66,7 @@ int main(int argc, char *argv[])
 
 	//ID출력 및 입력받기
     printf("ID: ");
-    scanf("%s", id);
+    scanf("%4s", id);
     puts("");
     if (strlen(id) != 4) {
         puts("Error: ID length must be 4");
@@ -72,7 +74,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if (strcmp(mode, "load")) {
+    if (!strcmp(mode, "load")) {
         vec[0].iov_base = mode;
         vec[0].iov_len = MODE_SIZE;
         vec[1].iov_base = id;
@@ -81,10 +83,11 @@ int main(int argc, char *argv[])
         read(sock, buf, MAX); //server소켓에서 buf에 데이터를 읽어오기
         puts(buf); //buf 내용 출력
         close(sock);
+        return 0;
     }
 
     //save일 경우 수행
-    puts("Operand count: ");
+    printf("Operand count: ");
     scanf("%d", &opCount); //operation Count를 입력받는다
     buf[0] = (char)opCount; //buf배열 첫번째 인덱스에 opCount를 char형태로 저장
 
