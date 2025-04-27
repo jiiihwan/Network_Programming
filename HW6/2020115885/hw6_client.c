@@ -9,11 +9,11 @@
 #define MAX 1024
 #define MODE_SIZE 5
 #define ID_SIZE 5
-void error_handling(char *message);
+void error_handling(char *message); 
 
 int main(int argc, char *argv[])
 {
-	int sock; //소켓 선언
+	int sock; //소켓 선언aa
 	//char message[MAX]; //메세지 배열 선언
 	int str_len;
 	struct sockaddr_in serv_adr;
