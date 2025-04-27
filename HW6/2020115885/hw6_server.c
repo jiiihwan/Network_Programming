@@ -11,9 +11,9 @@
 #include <sys/wait.h>
 #include <sys/uio.h>  
 
-#define MOD_SIZE 100
-#define BUF_SIZE 100
-#define ID_SIZE 100
+#define MOD_SIZE 5
+#define ID_SIZE 5
+#define BUF_SIZE 1024
 #define REQ_SIZE 100
 #define DATA_MAX 100
 void error_handling(char *buf);
@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
 	struct timeval timeout; //select 대기시간용
 	fd_set reads, cpy_reads; //select용 fd_set형 집합, 원본과 복사본
 
+    //계산기 변수들
     char opCount;
     int opResult;
     int operand[BUF_SIZE];
@@ -40,6 +41,7 @@ int main(int argc, char *argv[])
 	struct sigaction act;
 	int fdsA[2], fdsB[2];
 
+    //mode와 id
     struct iovec vec[3];
     char mode[MOD_SIZE]; // mode ("save", "load", "quit")
     char id[ID_SIZE];   // id (길이 4)
@@ -47,12 +49,13 @@ int main(int argc, char *argv[])
 
     // 각 버퍼 설정
     vec[0].iov_base = mode;
-    vec[0].iov_len = sizeof(mode);
+    vec[0].iov_len = MOD_SIZE;
     vec[1].iov_base = id;
-    vec[1].iov_len = sizeof(id);
+    vec[1].iov_len = ID_SIZE;
     vec[2].iov_base = result;
-    vec[2].iov_len = sizeof(result);
+    vec[2].iov_len = BUF_SIZE;
 
+    //save와 load에 사용할 id와 result 담을 구조체
     typedef struct data
     {
         char id[ID_SIZE];
@@ -60,8 +63,9 @@ int main(int argc, char *argv[])
     }data;
 
     data dataArray[DATA_MAX];
-    int cnt = 0;
 
+    int cnt = 0;
+    char load_buf[BUF_SIZE];
 
 	if(argc!=2) {
 		printf("Usage : %s <port>\n", argv[0]);
@@ -80,6 +84,9 @@ int main(int argc, char *argv[])
 	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	serv_adr.sin_port=htons(atoi(argv[1]));
 	
+    int enable = 1;
+    setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)); //reuse
+
 	if(bind(serv_sock, (struct sockaddr*) &serv_adr, sizeof(serv_adr))==-1)
 		error_handling("bind() error");
 	if(listen(serv_sock, 5)==-1)
@@ -93,8 +100,31 @@ int main(int argc, char *argv[])
         int cnt = 0;
 		while(1)
 		{
-            read(fdsA[0], &dataArray[cnt], sizeof(dataArray[cnt]));
-            cnt++;
+            read(fdsA[0], mode, MOD_SIZE); //부모프로세스로부터 mode값 식별
+
+            if(strcmp(mode, "save") == 0 ){ 
+                read(fdsA[0], &dataArray[cnt], sizeof(dataArray[cnt])); // id와 결과값 dataArray구조체로 받아서 저장
+                cnt++;
+            }
+            else if(strcmp(mode, "load") == 0 ){
+                read(fdsA[0], id, ID_SIZE); //부모프로세스로부터 id값 식별
+                memset(result, 0 ,sizeof(result)); //result배열 초기화
+                for (int i = 0; i < cnt; i++){  //dayaArray 개수만큼 순환
+                    if(strcmp(id, dataArray[i].id) == 0 ){ //받아온 id와 dataArray에 있는id가 일치하면
+                        sprintf(load_buf, "%s: %s", dataArray[i].id, dataArray[i].req); //load_buf에 id: result 꼴로 저장
+                        strcat(result, load_buf); //result에 이어붙히기
+                    }
+                }
+                if (result[0]){ //result에 문자가 존재하면
+                    write(fdsB[1], result, strlen(result));
+                }
+                else{ //result에 아무것도 없으면
+                    char not_exist[BUF_SIZE] = "Not exist\n";
+                    write(fdsB[1], not_exist, strlen(not_exist));
+                }
+
+            }
+
 
 
 
@@ -143,6 +173,7 @@ int main(int argc, char *argv[])
 					else
 					{
                         if (strcmp(mode, "save") == 0){
+                            write(fdsA[1], mode, MOD_SIZE); //mode정보 자식프로세스로 보내기
                             //read(i, &opCount, 1); //cfd로부터 최대 1바이트만 읽어서 opCount변수에 저장한다
                             opCount = result[0];  // opCount 저장
 
@@ -173,7 +204,8 @@ int main(int argc, char *argv[])
                                 }
                                 sprintf(buf + strlen(buf), "%c%d", operator[j], operand[j+1]); //buf에 연산자랑 다음 operand 이어붙이기
                             }
-                    
+                            
+                            printf("Operation result: %d\n", opResult);
                             write(i, &opResult, 4); //클라이언트 소켓에 opResult 전송
                 
                             sprintf(buf + strlen(buf), "=%d\n", opResult); //buf에 opResult까지 붙이기
@@ -183,16 +215,33 @@ int main(int argc, char *argv[])
                             write(fdsA[1], &dataArray[cnt], sizeof(dataArray[cnt]));
                             cnt++;
                             printf("save to %s\n", id);
+
+                            close(i);
+                            FD_CLR(i, &reads);
+                            printf("closed client: %d \n", i);
                         }
                         else if (strcmp(mode, "load") == 0) {
                             printf("load from %s\n", id);
-                            write(fdsA[1], mode, MOD_SIZE);
-                            write(fdsA[1], id, ID_SIZE);
+                            write(fdsA[1], mode, MOD_SIZE); //mode정보 자식프로세스로 보내기
+                            write(fdsA[1], id, ID_SIZE); //id정보 자식프로세스로 보내기
 
+                            str_len = read(fdsB[0], load_buf, sizeof(load_buf)); //자식프로세스로부터 result 문자열 읽어서 load_buf에 저장
 
-
-
+                            write(i, load_buf, str_len); //현재 파일디스크립터에 result 문자열 보내기
+                            
+                            close(i);
+                            FD_CLR(i, &reads);
+                            printf("closed client: %d \n", i);
                         }
+                        else if (strcmp(mode, "quit") == 0) {
+                            write(fdsA[1], mode, MOD_SIZE); //mode정보 자식프로세스로 보내기
+                            puts("quit");
+
+                            close(i);
+                            FD_CLR(i, &reads);
+                            printf("closed client: %d \n", i);
+                        }
+
                         
 					
 					}

@@ -41,10 +41,9 @@ int main(int argc, char *argv[])
 
     //Mode출력 및 입력받기
     printf("Mode: ");
-    scanf("%4s", mode);
-    puts("");
+    scanf("%s", mode);
     if (strcmp(mode, "save") != 0 && strcmp(mode, "load") != 0 && strcmp(mode, "quit") != 0) {
-        printf("supported mode: save load quit");
+        printf("supported mode: save load quit\n");
         close(sock);
         return 0;
     }
@@ -66,8 +65,7 @@ int main(int argc, char *argv[])
 
 	//ID출력 및 입력받기
     printf("ID: ");
-    scanf("%4s", id);
-    puts("");
+    scanf("%s", id);
     if (strlen(id) != 4) {
         puts("Error: ID length must be 4");
         close(sock);
@@ -80,8 +78,9 @@ int main(int argc, char *argv[])
         vec[1].iov_base = id;
         vec[1].iov_len = ID_SIZE;
         writev(sock, vec, 2); //server로 write
-        read(sock, buf, MAX); //server소켓에서 buf에 데이터를 읽어오기
-        puts(buf); //buf 내용 출력
+        str_len = read(sock, buf, MAX-1); //server소켓에서 buf에 데이터를 읽어오기
+        buf[str_len] = 0;
+        printf("%s", buf); //buf 내용 출력
         close(sock);
         return 0;
     }
@@ -92,7 +91,7 @@ int main(int argc, char *argv[])
     buf[0] = (char)opCount; //buf배열 첫번째 인덱스에 opCount를 char형태로 저장
 
     if(buf[0] <= 0) { //opCount가 음수면 소켓 종료
-        printf("Overflow will happen(%d)", opCount);
+        printf("Overflow will happen(%d)\n", opCount);
         close(sock);
         return 0;
     }
