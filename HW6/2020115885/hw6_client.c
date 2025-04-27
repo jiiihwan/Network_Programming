@@ -13,7 +13,7 @@ void error_handling(char *message);
 
 int main(int argc, char *argv[])
 {
-	int sock; //소켓 선언aa
+	int sock; //소켓 선언aabb
 	//char message[MAX]; //메세지 배열 선언
 	int str_len;
 	struct sockaddr_in serv_adr;
