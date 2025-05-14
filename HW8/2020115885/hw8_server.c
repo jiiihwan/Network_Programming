@@ -1,112 +1,161 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <pthread.h>
+#include <sys/uio.h>
+#include <sys/socket.h>
 
-#define BUF_SIZE 100        // 메시지 버퍼 크기
-#define MAX_CLNT 256        // 최대 클라이언트 수
+#define BUF_SIZE 1024
+#define NAME_SIZE 5
+#define MAX_CLNT 256
 
-void * handle_clnt(void * arg);    // 클라이언트 처리를 위한 스레드 함수
-void send_msg(char * msg, int len); // 모든 클라이언트에게 메시지 전송
-void error_handling(char * msg);    // 에러 처리 함수
+void *handle_clnt(void *arg);
+void send_all(char *msg, int len);
+void error_handling(char *msg);
 
-int clnt_cnt=0;                     // 현재 접속중인 클라이언트 수
-int clnt_socks[MAX_CLNT];          // 클라이언트 소켓 배열
-pthread_mutex_t mutx;              // 스레드 동기화를 위한 뮤텍스
+int clnt_cnt = 0;
+int clnt_socks[MAX_CLNT];
+pthread_mutex_t mutx;
 
-int main(int argc, char *argv[])
+
+int main(int argc, char *argv[]) 
 {
-	int serv_sock, clnt_sock;
-	struct sockaddr_in serv_adr, clnt_adr;
-	int clnt_adr_sz;
-	pthread_t t_id;
+    int serv_sock, clnt_sock;
+    struct sockaddr_in serv_adr, clnt_adr;
+    socklen_t adr_sz;
+    pthread_t t_id;
 
-	// 포트 번호 인자 확인
-	if(argc!=2) {
-		printf("Usage : %s <port>\n", argv[0]);
-		exit(1);
-	}
-  
-	pthread_mutex_init(&mutx, NULL);    // 뮤텍스 초기화
-	serv_sock=socket(PF_INET, SOCK_STREAM, 0);  // 서버 소켓 생성
+    if (argc != 2) {
+        printf("Usage : %s <port>\n", argv[0]);
+        exit(1);
+    }
 
-	// 서버 주소 설정
-	memset(&serv_adr, 0, sizeof(serv_adr));
-	serv_adr.sin_family=AF_INET; 
-	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);  // 모든 IP에서 접속 가능
-	serv_adr.sin_port=htons(atoi(argv[1]));      // 포트 번호 설정
-	
-	// 소켓 바인딩 및 리스닝
-	if(bind(serv_sock, (struct sockaddr*) &serv_adr, sizeof(serv_adr))==-1)
-		error_handling("bind() error");
-	if(listen(serv_sock, 5)==-1)
-		error_handling("listen() error");
-	
-	// 클라이언트 연결 수락 및 처리
-	while(1)
-	{
-		clnt_adr_sz=sizeof(clnt_adr);
-		clnt_sock=accept(serv_sock, (struct sockaddr*)&clnt_adr,&clnt_adr_sz);
-		
-		// 새로운 클라이언트 소켓을 배열에 추가
-		pthread_mutex_lock(&mutx);
-		clnt_socks[clnt_cnt++]=clnt_sock;
-		pthread_mutex_unlock(&mutx);
-	
-		// 새로운 클라이언트를 위한 스레드 생성
-		pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
-		pthread_detach(t_id);  // 스레드 분리
-		printf("Connected client IP: %s \n", inet_ntoa(clnt_adr.sin_addr));
-	}
-	close(serv_sock);
-	return 0;
-}
-	
-void * handle_clnt(void * arg)
-{
-	int clnt_sock=*((int*)arg);
-	int str_len=0, i;
-	char msg[BUF_SIZE];
-	
-	// 클라이언트로부터 메시지를 받아 모든 클라이언트에게 전송
-	while((str_len=read(clnt_sock, msg, sizeof(msg)))!=0)
-		send_msg(msg, str_len);
-	
-	// 클라이언트 연결 종료 시 처리
-	pthread_mutex_lock(&mutx);
-	for(i=0; i<clnt_cnt; i++)   // 연결이 끊긴 클라이언트 제거
-	{
-		if(clnt_sock==clnt_socks[i])    // 현재 처리 중인 클라이언트 소켓을 찾았을 때
-		{
-			while(i++<clnt_cnt-1)       // 배열의 끝까지 반복
-				clnt_socks[i]=clnt_socks[i+1];    // 한 칸씩 앞으로 당겨서 빈 공간 채우기
-			break;    // 클라이언트 제거 완료 후 반복문 종료
-		}
-	}
-	clnt_cnt--;
-	pthread_mutex_unlock(&mutx);
-	close(clnt_sock);
-	return NULL;
+    pthread_mutex_init(&mutx, NULL);
+    serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+
+    memset(&serv_adr, 0, sizeof(serv_adr));
+    serv_adr.sin_family = AF_INET;
+    serv_adr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_adr.sin_port = htons(atoi(argv[1]));
+
+    if (bind(serv_sock, (struct sockaddr *)&serv_adr, sizeof(serv_adr)) == -1)
+        error_handling("bind() error");
+    if (listen(serv_sock, 5) == -1)
+        error_handling("listen() error");
+
+    while (1) {
+        adr_sz = sizeof(clnt_adr);
+        clnt_sock = accept(serv_sock, (struct sockaddr *)&clnt_adr, &adr_sz);
+
+        pthread_mutex_lock(&mutx);
+        clnt_socks[clnt_cnt++] = clnt_sock;
+        pthread_mutex_unlock(&mutx);
+
+        printf("Connected client port: %d\n", ntohs(clnt_adr.sin_port));
+
+        pthread_create(&t_id, NULL, handle_clnt, (void *)&clnt_sock);
+        //int *clnt_sock_ptr = malloc(sizeof(int));   // 새 소켓 변수 힙에 동적 할당
+        //*clnt_sock_ptr = clnt_sock;
+        //pthread_create(&t_id, NULL, handle_clnt, (void *)clnt_sock_ptr);
+        pthread_detach(t_id);
+    
+    }
+
+    //close(serv_sock);
+    //return 0;
 }
 
-// 모든 클라이언트에게 메시지 전송
-void send_msg(char * msg, int len)   
+void *handle_clnt(void *arg) 
 {
-	int i;
-	pthread_mutex_lock(&mutx);
-	for(i=0; i<clnt_cnt; i++)
-		write(clnt_socks[i], msg, len);
-	pthread_mutex_unlock(&mutx);
+    int clnt_sock = *((int *)arg);  // 값 복사
+    //free(arg);                      // 동적 할당된 메모리 해제
+    int str_len=0;
+    struct iovec vec[2];
+    char name[NAME_SIZE];
+    char req[BUF_SIZE];
+    char msg[BUF_SIZE*2];
+
+    int opCount;
+    int operand[BUF_SIZE];
+    char operator[BUF_SIZE];
+    int opResult;
+    char buf[BUF_SIZE];
+
+    vec[0].iov_base = name;
+    vec[0].iov_len = NAME_SIZE;
+    vec[1].iov_base = req;
+    vec[1].iov_len = BUF_SIZE;
+
+    // 클라이언트로부터 메시지를 받아 계산하고 모든 클라이언트에게 전송
+    while (1) {
+        int str_len = readv(clnt_sock, vec, 2);
+        if (str_len <= 0) {
+            // 클라이언트가 정상 종료하거나 강제종료(예: exit, Ctrl+C 등)
+            break;
+        }
+
+        opCount = req[0];
+
+        for(int j=0; j<opCount; j++) 
+        { //입력한 opCount만큼 반복
+            memcpy(&operand[j], &req[1 + j*4], 4);  // 4바이트씩 operand 복원
+        }
+
+        opResult = operand[0];  //opResult에 첫번째 숫자 전달
+        sprintf(buf, "%d", operand[0]);  // 시작:  첫 번째 숫자
+
+        for(int j=0; j<opCount-1; j++) 
+        { //operator 빼고 반복
+            operator[j] = req[1 + opCount*4 + j];  // 그 뒤에는 operator들
+            switch (operator[j]) { //operator case에 따른 스위치문
+            case '+':
+                opResult += operand[j+1]; //+일경우 opresult변수에 i+1 번째 숫자 덧셈
+                break;
+            case '-':
+                opResult -= operand[j+1];
+                break;
+            case '*':
+                opResult *= operand[j+1];
+            }
+            sprintf(buf + strlen(buf), "%c%d", operator[j], operand[j+1]); //buf에 연산자랑 다음 operand 이어붙이기
+        }
+
+        snprintf(msg, sizeof(msg), "[%s] %s=%d\n", name, buf, opResult);
+        send_all(msg, strlen(msg));
+    }
+
+    // 클라이언트 연결 종료 시 처리
+    int i;
+    pthread_mutex_lock(&mutx);
+    for (i = 0; i < clnt_cnt; i++) 
+    {
+        if (clnt_sock == clnt_socks[i]) 
+        {
+            while (i++ < clnt_cnt-1)
+                clnt_socks[i] = clnt_socks[i+1];
+            break;
+        }
+    }
+    clnt_cnt--;
+    pthread_mutex_unlock(&mutx);
+    close(clnt_sock);
+    printf("client close\n");
+    return NULL;
 }
 
-// 에러 처리 함수
-void error_handling(char * msg)
+void send_all(char *msg, int len) 
 {
-	fputs(msg, stderr);
-	fputc('\n', stderr);
-	exit(1);
+    int i;  
+    pthread_mutex_lock(&mutx);
+    for (i = 0; i < clnt_cnt; i++)
+        write(clnt_socks[i], msg, len);
+    pthread_mutex_unlock(&mutx);
+}
+
+void error_handling(char *msg) {
+    fputs(msg, stderr);
+    fputc('\n', stderr);
+    exit(1);
 }
